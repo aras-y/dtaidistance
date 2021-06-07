@@ -167,7 +167,8 @@ def ub_euclidean(s1, s2):
 def distance(s1, s2,
              window=None, max_dist=None, max_step=None,
              max_length_diff=None, penalty=None, psi=None,
-             use_c=False, use_pruning=False, only_ub=False):
+             use_c=False, use_pruning=False, only_ub=False, 
+             d_matrix=None):
     """
     Dynamic Time Warping.
 
@@ -187,6 +188,7 @@ def distance(s1, s2,
     :param use_pruning: Prune values based on Euclidean distance.
         This is the same as passing ub_euclidean() to max_dist
     :param only_ub: Only compute the upper bound (Euclidean).
+    :param d_matrix: Matrix of pairwise distances between the samples of s1 and s2, of size len(s1) by len(s2).
 
     Returns: DTW distance
     """
@@ -258,7 +260,10 @@ def distance(s1, s2,
         if psi != 0 and j_start == 0 and i < psi:
             dtw[i1 * length] = 0
         for j in range(j_start, j_end):
-            d = (s1[i] - s2[j])**2
+            if d_matrix is None:
+                d = (s1[i] - s2[j])**2
+            else:
+                d = d_matrix[i, j]
             if d > max_step:
                 continue
             assert j + 1 - skip >= 0
@@ -330,7 +335,8 @@ def _distance_c_with_params(t):
 
 
 def warping_paths(s1, s2, window=None, max_dist=None,
-                  max_step=None, max_length_diff=None, penalty=None, psi=None):
+                  max_step=None, max_length_diff=None, penalty=None, psi=None,
+                  d_matrix=None):
     """
     Dynamic Time Warping.
 
@@ -344,6 +350,7 @@ def warping_paths(s1, s2, window=None, max_dist=None,
     :param max_length_diff: see :meth:`distance`
     :param penalty: see :meth:`distance`
     :param psi: see :meth:`distance`
+    :param d_matrix: see :meth:`distance`
     :returns: (DTW distance, DTW matrix)
     """
     if np is None:
@@ -397,7 +404,10 @@ def warping_paths(s1, s2, window=None, max_dist=None,
         #                                                y)
         for j in range(j_start, j_end):
             # print('j =', j, 'max=',min(c, c - r + i + window))
-            d = (s1[i] - s2[j])**2
+            if d_matrix is None:
+                d = (s1[i] - s2[j])**2
+            else:
+                d = d_matrix[i, j]
             if max_step is not None and d > max_step:
                 continue
             # print(i, j + 1 - skip, j - skipp, j + 1 - skipp, j - skip)

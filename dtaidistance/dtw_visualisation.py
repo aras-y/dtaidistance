@@ -110,14 +110,32 @@ def plot_warping(s1, s2, path, filename=None):
     fig, ax = plt.subplots(nrows=2, ncols=1, sharex='all', sharey='all')
     ax[0].plot(s1)
     ax[1].plot(s2)
+    # To allow matplotlib to automatically set the limits when the beginning or the end of a time series is missing:
+    ax[0].plot(0, np.mean(ax[0].get_ylim()), alpha=0)
+    ax[0].plot(len(s1) - 1, np.mean(ax[0].get_ylim()), alpha=0)
+    ax[1].plot(0, np.mean(ax[1].get_ylim()), alpha=0)
+    ax[1].plot(len(s2) - 1, np.mean(ax[1].get_ylim()), alpha=0)
     plt.tight_layout()
     lines = []
     line_options = {'linewidth': 0.5, 'color': 'orange', 'alpha': 0.8}
+    line_options_missing = {'linewidth': 0.5, 'color': 'tan', 'alpha': 0.8, 'linestyle': '--'} # for missing data
     for r_c, c_c in path:
         if r_c < 0 or c_c < 0:
             continue
-        con = ConnectionPatch(xyA=[r_c, s1[r_c]], coordsA=ax[0].transData,
-                              xyB=[c_c, s2[c_c]], coordsB=ax[1].transData, **line_options)
+        yA = s1[r_c]
+        yB = s2[c_c]
+        if np.isnan(yA) or np.isnan(yB):
+            lno = line_options_missing
+        else:
+            lno = line_options
+        if np.isnan(yA):
+            # yA = np.mean(ax[0].get_ylim()) # use the center of the vertical axis when the sample is missing
+            yA = ax[0].get_ylim()[0] # use the bottom of the vertical axis when the sample is missing
+        if np.isnan(yB):
+            # yB = np.mean(ax[1].get_ylim()) # use the center of the vertical axis when the sample is missing
+            yB = ax[1].get_ylim()[1] # use the top of the vertical axis when the sample is missing
+        con = ConnectionPatch(xyA=[r_c, yA], coordsA=ax[0].transData,
+                              xyB=[c_c, yB], coordsB=ax[1].transData, **lno)
         lines.append(con)
     for line in lines:
         fig.add_artist(line)
@@ -128,7 +146,7 @@ def plot_warping(s1, s2, path, filename=None):
     return fig, ax
 
 
-def plot_warpingpaths(s1, s2, paths, path=None, filename=None, shownumbers=False, showlegend=False):
+def plot_warpingpaths(s1, s2, paths, path=None, filename=None, shownumbers=False, showlegend=False, d=None):
     """Plot the warping paths matrix.
 
     :param s1: Series 1
@@ -147,8 +165,8 @@ def plot_warpingpaths(s1, s2, paths, path=None, filename=None, shownumbers=False
         logger.error("The plot_warpingpaths function requires the matplotlib package to be installed.")
         return
     ratio = max(len(s1), len(s2))
-    min_y = min(np.min(s1), np.min(s2))
-    max_y = max(np.max(s1), np.max(s2))
+    min_y = min(np.nanmin(s1), np.nanmin(s2))
+    max_y = max(np.nanmax(s1), np.nanmax(s2))
 
     fig = plt.figure(figsize=(10, 10), frameon=True)
     if showlegend:
@@ -165,10 +183,10 @@ def plot_warpingpaths(s1, s2, paths, path=None, filename=None, shownumbers=False
                            left=0, right=10.0, bottom=0, top=1.0,
                            height_ratios=height_ratios,
                            width_ratios=width_ratios)
-    max_s2_x = np.max(s2)
+    max_s2_x = np.nanmax(s2)
     max_s2_y = len(s2)
-    max_s1_x = np.max(s1)
-    min_s1_x = np.min(s1)
+    max_s1_x = np.nanmax(s1)
+    min_s1_x = np.nanmin(s1)
     max_s1_y = len(s1)
 
     if path is None:
@@ -184,7 +202,9 @@ def plot_warpingpaths(s1, s2, paths, path=None, filename=None, shownumbers=False
 
     ax0 = fig.add_subplot(gs[0, 0])
     ax0.set_axis_off()
-    ax0.text(0, 0, "Dist = {:.4f}".format(paths[p[-1][0], p[-1][1]]))
+    if d is None:
+        d = paths[p[-1][0], p[-1][1]]
+    ax0.text(0, 0, "Dist = {:.4f}".format(d))
     ax0.xaxis.set_major_locator(plt.NullLocator())
     ax0.yaxis.set_major_locator(plt.NullLocator())
 
@@ -211,7 +231,8 @@ def plot_warpingpaths(s1, s2, paths, path=None, filename=None, shownumbers=False
 
     ax3 = fig.add_subplot(gs[1, 1])
     # ax3.set_aspect(1)
-    img = ax3.matshow(paths[1:, 1:])
+    # img = ax3.matshow(paths[1:, 1:])
+    img = ax3.matshow(paths[-len(s1):, -len(s2):])
     # ax3.grid(which='major', color='w', linestyle='-', linewidth=0)
     # ax3.set_axis_off()
     py, px = zip(*p)
