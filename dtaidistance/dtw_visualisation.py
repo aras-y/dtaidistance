@@ -92,14 +92,21 @@ def plot_warp(from_s, to_s, new_s, path, filename=None):
     return fig, ax
 
 
-def plot_warping(s1, s2, path, filename=None):
+def plot_warping(s1, s2, path, filename=None, missing_time_sample_location='edge'):
     """Plot the optimal warping between to sequences.
 
     :param s1: From sequence.
     :param s2: To sequence.
     :param path: Optimal warping path.
     :param filename: Filename path (optional).
+    :param missing_time_sample_location: Vertical position of the end of a warping line that corresponds to a missing time sample: 
+                                         'edge': nearest edge of the subplot (DEFAULT),
+                                         'middle': centered,
+                                         'interpolation': determined by linear interpolation.
     """
+    if missing_time_sample_location == None:
+        missing_time_sample_location = 'edge'
+    
     try:
         import matplotlib.pyplot as plt
         import matplotlib as mpl
@@ -107,6 +114,19 @@ def plot_warping(s1, s2, path, filename=None):
     except ImportError:
         logger.error("The plot_warp function requires the matplotlib package to be installed.")
         return
+    
+    if missing_time_sample_location == 'interpolation':
+        from scipy.interpolate import interp1d
+        
+        def interpolate_missing(x): # apply linear interpolation to fill missing values
+            ind_missing = np.isnan(x)
+            x_interp = x.copy()
+            x_interp[np.where(ind_missing)[0]] = interp1d(np.where(~ind_missing)[0], x[~ind_missing])(np.where(ind_missing)[0])
+            return x_interp
+        
+        s1_interp = interpolate_missing(s1)
+        s2_interp = interpolate_missing(s2)
+            
     fig, ax = plt.subplots(nrows=2, ncols=1, sharex='all', sharey='all')
     ax[0].plot(s1)
     ax[1].plot(s2)
@@ -129,11 +149,21 @@ def plot_warping(s1, s2, path, filename=None):
         else:
             lno = line_options
         if np.isnan(yA):
-            # yA = np.mean(ax[0].get_ylim()) # use the center of the vertical axis when the sample is missing
-            yA = ax[0].get_ylim()[0] # use the bottom of the vertical axis when the sample is missing
+            if missing_time_sample_location == 'edge':
+                yA = ax[0].get_ylim()[0] # use the bottom of the vertical axis when the sample is missing
+            elif missing_time_sample_location == 'middle':
+                yA = np.mean(ax[0].get_ylim()) # use the center of the vertical axis when the sample is missing
+            elif missing_time_sample_location == 'interpolation':
+                yA = s1_interp[r_c] # determine the vertical position by linear interpolation
+            
         if np.isnan(yB):
-            # yB = np.mean(ax[1].get_ylim()) # use the center of the vertical axis when the sample is missing
-            yB = ax[1].get_ylim()[1] # use the top of the vertical axis when the sample is missing
+            if missing_time_sample_location == 'edge':
+                yB = ax[1].get_ylim()[1] # use the top of the vertical axis when the sample is missing
+            elif missing_time_sample_location == 'middle':
+                yB = np.mean(ax[1].get_ylim()) # use the center of the vertical axis when the sample is missing
+            elif missing_time_sample_location == 'interpolation':
+                yB = s2_interp[c_c] # determine the vertical position by linear interpolation
+            
         con = ConnectionPatch(xyA=[r_c, yA], coordsA=ax[0].transData,
                               xyB=[c_c, yB], coordsB=ax[1].transData, **lno)
         lines.append(con)
